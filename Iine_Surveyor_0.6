@@ -1,0 +1,131 @@
+// ==UserScript==
+// @name        Iine Surveyor 🟡
+// @namespace        http://tampermonkey.net/
+// @version        0.6
+// @description        スパム「いいね」かどうかを新着記事リストから調査する
+// @author        Ameba Blog User
+// @match        https://ameblo.jp/*
+// @match        https://blog.ameba.jp/ucs/top*
+// @icon        https://www.google.com/s2/favicons?sz=64&domain=ameblo.jp
+// @noframes
+// @grant        none
+// ==/UserScript==
+
+
+let target0=document.querySelector('body'); // 監視 target
+let monitor0=new MutationObserver(blog_page);
+monitor0.observe(target0, {childList: true}); // 監視開始
+
+let trial=0; //実行回数のカウント
+let report=0; // いいね一覧ボタンに到達した時のフラグ
+
+function blog_page(){
+    let eb=document.querySelector('#entryBody');
+    if(eb){ // ブログページの場合
+        trial+=1;
+        if(trial<2){
+            window.scrollTo(0, eb.scrollHeight +(window.innerHeight/2)+200); } // 文末にスクロール移動
+        if(trial<10){
+            iine_sw_wait(); }}
+
+    function iine_sw_wait(){
+        let iine_sw=document.querySelector('.iineEntryCnt'); // 待機要素  「いいね！した人一覧」ボタン
+        if(iine_sw){
+            iine_sw.click();
+            setTimeout(()=>{
+                trial=10;
+                report=1;
+                close();
+                iine_task(); }, 100); }} // ボタンがあればクリックする
+
+
+    setTimeout(()=>{ // 15sec待って一覧ボタンが無い時はウインドウを閉じる
+        let entryAction=document.querySelector('[data-uranus-component="entryAction"]');
+        if(report==0 && entryAction){
+            window.close(); }}, 15000);
+
+
+    function close(){
+        let close=document.querySelector('._2RGF7Lsd');
+        if(close){
+            close.addEventListener('mouseover', function(){
+                monitor0.disconnect(); }); }}
+
+    function iine_task(){
+        setTimeout(()=>{
+            let sm=document.querySelector('#sm');
+            let sm_svg=document.querySelector('#sm .svgm_t');
+            if(sm && sm_svg){
+                if(sm_svg.style.fill!='red'){
+                    sm.click(); }} // Bad Iine Mute 対策 ●
+
+            else{
+                let more=document.querySelector('#moreLinkBottom'); // Moreがある場合は全て呼込む
+                let item=document.querySelectorAll('#iineEntryContents li');
+                if(more && item.length<30){ // リストを最低30行まで自動で開く 🔴
+                    more.click();
+                }}
+        }, 1200); }
+
+} // blog_page()
+
+
+
+let target1=document.querySelector('body'); // 監視 target
+let monitor1=new MutationObserver(check_dia);
+monitor1.observe(target1, {childList: true, subtree: true}); // 監視開始
+
+function check_dia(){
+    if(document.querySelector('#iineEntry')){ // 管理トップ
+        let svgm_d=document.querySelector('.svgm_d');
+        let header=document.querySelector('.iineEntryModal__header');
+        if(header && svgm_d){
+            svgm_d.style.pointerEvents='none'; // Bad Iine Mute 対策 ●
+            if(svgm_d.style.fill=='red'){
+                header.click(); }} // Bad Iine Mute 対策 ●
+
+        let user_li=[];
+        let nickname=[];
+
+        user_li=document.querySelectorAll('.iineEntryModal__contents li');
+        if(user_li.length !=0){
+            for(let k=0; k<user_li.length; k++){ // ダイアログのリストのマスク
+                let link=user_li[k].querySelector('a');
+                if(link){
+                    link.setAttribute('href', ''); } // Bad Iine Mute 対策 ●
+                let nic=user_li[k].querySelector('.iineEntryModal__nickname');
+                if(nic){
+                    nic.style.background='#607d8b';
+                    nic.style.color='#fff';
+                    nickname[k]=nic.textContent;
+                    survey(k); }}}
+
+
+
+        function survey(k){
+            user_li[k].onclick=function(event){
+                event.preventDefault(); }
+
+            user_li[k].onmouseup=function(event){
+                event.preventDefault(); }
+
+            user_li[k].onmousedown=function(event){
+                event.preventDefault();
+                if(!event.shiftKey){
+                    let text=nickname[k];
+                    if(navigator.clipboard){
+                        navigator.clipboard.writeText(text); } // クリップボードにコピー
+                    setTimeout(()=>{
+                        goto_genre(nickname[k]);
+                    },200); }}}
+
+
+
+
+        function goto_genre(user){
+            let genre=document.querySelector('.accessAnalysis__summaryRankingGenreRelatedLink');
+            let gene_href=genre.getAttribute('href');
+            window.open(gene_href +'/entries', '_blank'); } // 参加ジャンルの新着記事リストを開く
+
+    }} // check_dia()
+
